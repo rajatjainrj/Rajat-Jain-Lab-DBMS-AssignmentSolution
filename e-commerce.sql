@@ -44,7 +44,7 @@ create table ProductDetails
     foreign key (SUPP_ID) references Supplier (SUPP_ID)
 );
 
-create table Order
+create table ProductOrder
 (
     ORD_ID     int primary key,
     ORD_AMOUNT int,
@@ -101,7 +101,7 @@ VALUES (1, 1, 2, 1500),
        (4, 2, 3, 2500),
        (5, 4, 1, 1000);
 
-insert into Order
+insert into ProductOrder
 VALUES (20, 1500, '2021-10-12', 3, 5),
        (25, 30500, '2021-09-16', 5, 2),
        (26, 2000, '2021-10-05', 1, 1),
@@ -115,3 +115,60 @@ VALUES (1, 2, 2, 4),
        (4, 1, 3, 2),
        (5, 4, 5, 4);
 
+-- # 3
+select count(C.CUS_ID), C.CUS_GENDER
+from Customer C
+         inner join ProductOrder PO on C.CUS_ID = PO.CUS_ID
+where PO.ORD_AMOUNT >= 3000
+group by C.CUS_GENDER;
+
+-- # 4
+select PO.*, P.PRO_NAME as productName
+from ProductOrder PO
+         inner join Product P on PO.PRO_ID = P.PRO_ID
+where PO.CUS_ID = 2;
+
+-- # 5
+select *
+from Supplier
+where SUPP_ID in (select PD.SUPP_ID
+                  from ProductDetails PD
+                  group by PD.SUPP_ID
+                  having COUNT(PD.SUPP_ID) > 1);
+
+-- # 6
+select CAT_NAME
+from Category
+where CAT_ID = (select P.CAT_ID
+                from Product P
+                         inner join ProductOrder PO on P.PRO_ID = PO.PRO_ID
+                where PO.ORD_AMOUNT = (select min(ORD_AMOUNT) from ProductOrder));
+
+-- # 7
+select PRO_ID, PRO_NAME
+from Product
+where PRO_ID in (select PRO_ID from ProductOrder where ORD_DATE > '2021-10-05');
+
+-- # 8
+select CUS_NAME, CUS_GENDER
+from Customer
+where CUS_NAME like 'A%'
+   or CUS_NAME like '%A';
+
+-- # 9
+drop procedure if exists ratingForSupplier;
+create procedure ratingForSupplier(SUPP_ID int)
+BEGIN
+    select case
+               when R.RAT_RATSTARS > 4 then 'Genuine Supplier'
+               when R.RAT_RATSTARS > 2 and R.RAT_RATSTARS <= 4 then 'Average Supplier'
+               else 'Supplier should not be considered' end as rating
+    from Rating R
+    where R.SUPP_ID = SUPP_ID;
+end;
+
+call ratingForSupplier(1);
+call ratingForSupplier(2);
+call ratingForSupplier(3);
+call ratingForSupplier(4);
+call ratingForSupplier(5);
