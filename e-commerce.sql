@@ -44,15 +44,15 @@ create table ProductDetails
     foreign key (SUPP_ID) references Supplier (SUPP_ID)
 );
 
-create table ProductOrder
+create table `Order`
 (
     ORD_ID     int primary key,
     ORD_AMOUNT int,
     ORD_DATE   date,
     CUS_ID     int,
-    PRO_ID     int,
+    PROD_ID    int,
     foreign key (CUS_ID) references Customer (CUS_ID),
-    foreign key (PRO_ID) references Product (PRO_ID)
+    foreign key (PROD_ID) references ProductDetails (PROD_ID)
 );
 
 create table Rating
@@ -101,7 +101,7 @@ VALUES (1, 1, 2, 1500),
        (4, 2, 3, 2500),
        (5, 4, 1, 1000);
 
-insert into ProductOrder
+insert into `Order`
 VALUES (20, 1500, '2021-10-12', 3, 5),
        (25, 30500, '2021-09-16', 5, 2),
        (26, 2000, '2021-10-05', 1, 1),
@@ -116,17 +116,19 @@ VALUES (1, 2, 2, 4),
        (5, 4, 5, 4);
 
 -- # 3
-select count(C.CUS_ID), C.CUS_GENDER
+select count(C.CUS_ID) as count, C.CUS_GENDER
 from Customer C
-         inner join ProductOrder PO on C.CUS_ID = PO.CUS_ID
-where PO.ORD_AMOUNT >= 3000
-group by C.CUS_GENDER;
+         inner join `Order` O on C.CUS_ID = O.CUS_ID
+where O.ORD_AMOUNT >= 3000
+group by C.CUS_GENDER
+having count > 2;
 
 -- # 4
-select PO.*, P.PRO_NAME as productName
-from ProductOrder PO
-         inner join Product P on PO.PRO_ID = P.PRO_ID
-where PO.CUS_ID = 2;
+select O.*, P.PRO_NAME as productName
+from `Order` O
+         inner join ProductDetails PD on O.PROD_ID = PD.PROD_ID
+         inner join Product P on PD.PRO_ID = P.PRO_ID
+where O.CUS_ID = 2;
 
 -- # 5
 select *
@@ -137,17 +139,20 @@ where SUPP_ID in (select PD.SUPP_ID
                   having COUNT(PD.SUPP_ID) > 1);
 
 -- # 6
-select CAT_NAME
+select CAT_NAME, CAT_ID
 from Category
 where CAT_ID = (select P.CAT_ID
-                from Product P
-                         inner join ProductOrder PO on P.PRO_ID = PO.PRO_ID
-                where PO.ORD_AMOUNT = (select min(ORD_AMOUNT) from ProductOrder));
+                from ProductDetails PD
+                         inner join `Order` O on PD.PROD_ID = O.PROD_ID
+                         inner join Product P on PD.PRO_ID = P.PRO_ID
+                where O.ORD_AMOUNT = (select min(ORD_AMOUNT) from `Order`));
 
 -- # 7
-select PRO_ID, PRO_NAME
-from Product
-where PRO_ID in (select PRO_ID from ProductOrder where ORD_DATE > '2021-10-05');
+select P.PRO_ID, P.PRO_NAME, table2.oDate as orderDate
+from ProductDetails PD
+         inner join (select PROD_ID, ORD_DATE as oDate from `Order` where ORD_DATE > '2021-10-05') as table2
+                    on PD.PROD_ID = table2.PROD_ID
+         inner join Product P on PD.PRO_ID = P.PRO_ID;
 
 -- # 8
 select CUS_NAME, CUS_GENDER
@@ -159,7 +164,9 @@ where CUS_NAME like 'A%'
 drop procedure if exists ratingForSupplier;
 create procedure ratingForSupplier(SUPP_ID int)
 BEGIN
-    select case
+    #     declare var int default 9;
+    select R.RAT_RATSTARS,
+           case
                when R.RAT_RATSTARS > 4 then 'Genuine Supplier'
                when R.RAT_RATSTARS > 2 and R.RAT_RATSTARS <= 4 then 'Average Supplier'
                else 'Supplier should not be considered' end as rating
